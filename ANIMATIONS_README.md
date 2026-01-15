@@ -39,6 +39,7 @@ python animations.py register_packing --config my_config.json
 | Animation | Description | Use Case |
 |-----------|-------------|----------|
 | `register_packing` | Shows bit placement in registers using rorb/rorl | Demonstrates core optimization |
+| `register_packing_detailed` | Visual 32-bit register with colored bytes and symbols | Detailed bit manipulation |
 | `exact_match` | Bit operations for exact match calculation | Feedback computation |
 | `elimination_loop` | Candidate filtering and elimination | Main game loop |
 | `entropy_reduction` | Possibility reduction visualization | Algorithm efficiency |
