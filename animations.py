@@ -55,11 +55,16 @@ class BaseAnimation(Scene):
 
         return reg_rect, reg_label, reg_value
 
-    def animate_code_highlight(self, code_obj: Code, line_index: int,
+    def animate_code_highlight(self, code_obj, line_index: int,
                              highlight_color: str = None) -> Animation:
         """Highlight a specific line of code."""
         highlight_color = highlight_color or self.config['highlight_color']
-        if hasattr(code_obj, 'code') and line_index < len(code_obj.code):
+        if hasattr(code_obj, 'submobjects') and line_index < len(code_obj.submobjects):
+            # For VGroup of Text objects
+            line = code_obj.submobjects[line_index].copy()
+            return line.animate.set_color(highlight_color)
+        elif hasattr(code_obj, 'code') and line_index < len(code_obj.code):
+            # For Code objects (fallback)
             line = code_obj.code[line_index][0].copy()
             return line.animate.set_color(highlight_color)
         return Wait(0.1)
@@ -124,19 +129,17 @@ class RegisterPackingExecution(BaseAnimation):
         ebx_value_text = Text(f"0x{self.config['initial_mask']:08X}", font_size=24)
         ebx_value_text.move_to(ebx_rect)
 
-        # Assembly code
-        code = Code(code=r"""
-rorb %cl, %bl
-rorl $8, %ebx
-""", language="asm", font_size=24).to_corner(UL)
+        # Simple assembly code display
+        code_text = Text("rorb %cl, %bl\nrorl $8, %ebx", font_size=20, font="Monospace")
+        code_text.to_corner(UL)
 
-        self.play(Create(ebx_rect), Write(ebx_label), Write(ebx_value_text), Write(code))
+        self.play(Create(ebx_rect), Write(ebx_label), Write(ebx_value_text), Write(code_text))
 
         current_value = self.config['initial_mask']
 
         for i in range(4):
-            # Highlight first instruction
-            self.play(self.animate_code_highlight(code, 0), run_time=0.8)
+            # Simple highlight effect
+            self.play(code_text.animate.set_color(YELLOW), run_time=0.8)
 
             # Animate bit rotation
             # rorb %cl, %bl - rotate bottom byte right by cl positions
@@ -148,8 +151,8 @@ rorl $8, %ebx
             new_value_text.move_to(ebx_rect)
             self.play(Transform(ebx_value_text, new_value_text), run_time=self.config['bit_animation_delay'])
 
-            # Highlight second instruction
-            self.play(self.animate_code_highlight(code, 1), run_time=0.8)
+            # Reset code color
+            self.play(code_text.animate.set_color(WHITE), run_time=0.8)
 
             # rorl $8, %ebx - rotate entire register left by 8 bits
             new_value = ((new_value << 8) & 0xFFFFFFFF) | (new_value >> 24)
@@ -159,7 +162,7 @@ rorl $8, %ebx
             final_value_text = Text(f"0x{current_value:08X}", font_size=24)
             final_value_text.move_to(ebx_rect)
             self.play(Transform(ebx_value_text, final_value_text),
-                     ebx_value_text.animate.shift(RIGHT * 0.5), run_time=0.5)
+                     run_time=0.5)
 
         # Final message
         final_msg = Text("Full combination packed!", font_size=30, color=GREEN).next_to(ebx_rect, DOWN)
@@ -187,74 +190,26 @@ class ExactMatchExecution(BaseAnimation):
 
         title = self.add_title_and_wait("Exact Match Calculation")
 
-        # Create register visualizations
-        guess_rect, guess_label, guess_value = self.create_register_visualization("%eax", color=BLUE)
-        secret_rect, secret_label, secret_value = self.create_register_visualization("%ebx", color=RED)
-        result_rect, result_label, result_value = self.create_register_visualization("%ecx", color=GREEN)
+        # Simple demonstration
+        initial_text = Text("AND operation: guess & secret", font_size=24)
+        self.play(Write(initial_text))
 
-        guess_value_text = Text(f"0x{self.config['guess_value']:08X}", font_size=20)
-        guess_value_text.move_to(guess_rect)
-        secret_value_text = Text(f"0x{self.config['secret_value']:08X}", font_size=20)
-        secret_value_text.move_to(secret_rect)
+        # Show the calculation
+        guess_val = self.config['guess_value']
+        secret_val = self.config['secret_value']
+        result = guess_val & secret_val
 
-        # Position registers
-        guess_group = VGroup(guess_rect, guess_label, guess_value_text).shift(UP * 1.5)
-        secret_group = VGroup(secret_rect, secret_label, secret_value_text).shift(UP * 0.5)
-        result_group = VGroup(result_rect, result_label, result_value).shift(DOWN * 0.5)
+        calc_text = Text(f"0x{guess_val:08X} & 0x{secret_val:08X} = 0x{result:08X}", font_size=20)
+        calc_text.next_to(initial_text, DOWN)
+        self.play(Write(calc_text))
 
-        # Assembly code
-        code = Code(code=r"""
-andl %ebx, %eax    # AND guess & secret
-xorl %ecx, %ecx    # Clear counter
-test_loop:
-testb $1, %al      # Test LSB
-jz skip_inc        # If zero, skip
-incl %ecx          # Increment counter
-skip_inc:
-shrl $1, %eax      # Shift right
-jnz test_loop      # Loop if not zero
-""", language="asm", font_size=18).to_corner(UL)
+        # Count set bits
+        bit_count = bin(result).count('1')
+        result_text = Text(f"Number of exact matches: {bit_count}", font_size=24, color=GREEN)
+        result_text.next_to(calc_text, DOWN)
+        self.play(Write(result_text))
 
-        self.play(Create(guess_group), Create(secret_group), Create(result_group), Write(code))
-
-        # AND operation
-        self.play(self.animate_code_highlight(code, 0), run_time=0.8)
-        and_result = self.config['guess_value'] & self.config['secret_value']
-        and_text = Text(f"0x{and_result:08X}", font_size=20, color=YELLOW)
-        and_text.move_to(guess_rect)
-        self.play(Transform(guess_value_text, and_text))
-
-        # Clear counter
-        self.play(self.animate_code_highlight(code, 1), run_time=0.8)
-        counter_text = Text("0", font_size=20)
-        counter_text.move_to(result_rect)
-        self.play(Write(counter_text))
-
-        # Bit counting loop
-        current_value = and_result
-        bit_count = 0
-
-        for bit_pos in range(32):
-            if current_value & 1:
-                self.play(self.animate_code_highlight(code, 2), run_time=0.3)  # testb
-                self.play(self.animate_code_highlight(code, 4), run_time=0.3)  # incl
-                bit_count += 1
-                counter_text_new = Text(str(bit_count), font_size=20, color=GREEN)
-                counter_text_new.move_to(result_rect)
-                self.play(Transform(counter_text, counter_text_new))
-            else:
-                self.play(self.animate_code_highlight(code, 3), run_time=0.3)  # jz skip
-
-            self.play(self.animate_code_highlight(code, 5), run_time=0.3)  # shrl
-            current_value >>= 1
-
-            if current_value == 0:
-                break
-
-        final_msg = Text(f"Exact matches: {bit_count}", font_size=30, color=GREEN).to_edge(DOWN)
-        self.play(Write(final_msg))
-        self.wait(2)
-
+        self.wait(3)
         self.cleanup_scene(title)
 
 
@@ -297,15 +252,16 @@ class EliminationLoopExecution(BaseAnimation):
         ecx_label = Text("%ecx (index)", font_size=20).next_to(ecx_counter, DOWN)
 
         # Assembly code
-        code = Code(code=r"""
-movl sve_kombinacije(,%ecx,4), %ebx
-call histogram
-cmpl crveni, %esi
-jne skip
-movl %ebx, rezultat(,%edx,4)
-incl %edx
-skip:
-""", language="asm", font_size=18).to_edge(RIGHT)
+        code_lines = [
+            "movl sve_kombinacije(,%ecx,4), %ebx",
+            "call histogram",
+            "cmpl crveni, %esi",
+            "jne skip",
+            "movl %ebx, rezultat(,%edx,4)",
+            "incl %edx",
+            "skip:"
+        ]
+        code = VGroup(*[Text(line, font_size=16, font="Monospace").align_to(code_lines[0], LEFT) for line in code_lines]).arrange(DOWN, aligned_edge=LEFT).to_edge(RIGHT)
 
         # Position elements
         memory_group = VGroup(memory_blocks, memory_label).shift(UP * 1.5)
@@ -346,9 +302,7 @@ skip:
                 self.play(self.animate_code_highlight(code, 4), run_time=0.3)  # incl %edx
 
                 # Mark as kept
-                kept_copy = memory_blocks[i].copy().set_color(GREEN)
-                kept_copy.move_to(memory_blocks[i])
-                self.play(Transform(memory_blocks[i], kept_copy), run_time=0.5)
+                self.play(memory_blocks[i].animate.set_color(GREEN), run_time=0.5)
 
                 result_index += 1
             else:
@@ -532,12 +486,13 @@ class StackOverwriteExecution(BaseAnimation):
         esp_label = Text("%esp →", font_size=20).next_to(esp_arrow, LEFT)
 
         # Assembly code
-        code = Code(code=r"""
-subl %eax, %esp     # skip empty slots
-pushl $znak_zuti    # push yellow peg
-pushl $znak_crveni   # push red peg
-pushl $znak_plavi    # push blue peg
-""", language="asm", font_size=18).to_edge(RIGHT)
+        code_lines = [
+            "subl %eax, %esp     # skip empty slots",
+            "pushl $znak_zuti    # push yellow peg",
+            "pushl $znak_crveni   # push red peg",
+            "pushl $znak_plavi    # push blue peg"
+        ]
+        code = VGroup(*[Text(line, font_size=16, font="Monospace").align_to(code_lines[0], LEFT) for line in code_lines]).arrange(DOWN, aligned_edge=LEFT).to_edge(RIGHT)
 
         # Initial setup
         self.play(Create(stack), Create(esp_arrow), Write(esp_label), Write(code))
@@ -566,7 +521,7 @@ pushl $znak_plavi    # push blue peg
 
             # Animate the push
             self.play(
-                Transform(stack[slot_index][1], new_symbol),
+                stack[slot_index][1].animate.become(new_symbol),
                 stack[slot_index][0].animate.set_color(symbol_info['color']),
                 run_time=0.8
             )
@@ -668,17 +623,11 @@ class BenchmarkChart(BaseAnimation):
         # Animate chart creation
         self.play(Create(axes), Write(x_label), Write(y_label))
 
-        # Animate bars growing
-        self.play(
-            assembly_bar.animate.scale([1, 1, 0]).scale([1, 1, 1]),  # Start from zero height
-            run_time=1.5
-        )
+        # Animate bars appearing
+        self.play(FadeIn(assembly_bar), run_time=1.0)
         self.play(Write(assembly_label), Write(assembly_value))
 
-        self.play(
-            c_bar.animate.scale([1, 1, 0]).scale([1, 1, 1]),  # Start from zero height
-            run_time=1.5
-        )
+        self.play(FadeIn(c_bar), run_time=1.0)
         self.play(Write(c_label), Write(c_value))
 
         # Show comparison
@@ -688,7 +637,7 @@ class BenchmarkChart(BaseAnimation):
         # Additional optimization note
         optimization_note = Text("~2-2.5× faster from bit-packing and register operations",
                                 font_size=24, color=GREEN).to_edge(DOWN)
-        self.play(Transform(comparison_text, optimization_note))
+        self.play(FadeOut(comparison_text), FadeIn(optimization_note), run_time=1.0)
         self.wait(2)
 
         self.cleanup_scene(title)
@@ -755,13 +704,65 @@ def main():
         'format': args.format,
     })
 
-    # This would normally render the animation, but for now we'll just print the config
-    print(f"Would render {args.animation} animation with config:")
+    # Render the animation using manim command line
+    print(f"Rendering {args.animation} animation...")
     print(f"Output: {scene_config['output_file_path']}")
     print(f"Quality: {args.quality} ({scene_config['pixel_width']}x{scene_config['pixel_height']})")
 
-    # In a real implementation, you'd call:
-    # animation.render(**scene_config)
+    import subprocess
+    import sys
+    import os
+
+    # Set environment variables for manim configuration
+    env = os.environ.copy()
+    env['MANIM_CONFIG_FILE'] = ''  # Don't use config file
+
+    # Build manim command
+    cmd = [
+        sys.executable, "-m", "manim",
+        "--format", args.format,
+        "--media_dir", str(output_dir),
+        "--custom_folders",
+        "-v", "WARNING"  # Reduce verbosity
+    ]
+
+    # Add quality settings
+    if args.quality == "low":
+        cmd.extend(["-ql"])
+    elif args.quality == "medium":
+        cmd.extend(["-qm"])
+    else:  # high
+        cmd.extend(["-qh"])
+
+    # Add the animation class and output name
+    cmd.extend(["animations.py", args.animation])
+
+    print(f"Running: {' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(cmd, env=env, cwd=Path(__file__).parent, capture_output=True, text=True)
+        if result.returncode == 0:
+            print("Animation rendering completed successfully!")
+
+            # Check if the output file was created
+            expected_file = output_dir / f"{args.animation}.{args.format}"
+            if expected_file.exists():
+                print(f"Output file created: {expected_file}")
+            else:
+                print(f"Warning: Expected output file not found: {expected_file}")
+                # List what files were actually created
+                print("Files in output directory:")
+                for file in output_dir.glob("*"):
+                    print(f"  {file.name}")
+
+        else:
+            print(f"Animation rendering failed with exit code: {result.returncode}")
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
+            return 1
+    except Exception as e:
+        print(f"Animation rendering failed: {e}")
+        return 1
 
 
 if __name__ == "__main__":

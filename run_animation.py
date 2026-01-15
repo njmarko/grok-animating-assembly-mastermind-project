@@ -17,30 +17,89 @@ def run_animation(animation_name: str, format_type: str = 'gif', quality: str = 
                  output_dir: str = 'media', config_file: str = None):
     """Run a specific animation with given parameters."""
 
+    # Map animation names to class names
+    animation_to_class = {
+        'register_packing': 'RegisterPackingExecution',
+        'exact_match': 'ExactMatchExecution',
+        'elimination_loop': 'EliminationLoopExecution',
+        'entropy_reduction': 'EntropyReduction',
+        'stack_overwrite': 'StackOverwriteExecution',
+        'benchmark_chart': 'BenchmarkChart'
+    }
+
+    # Get the actual class name for manim
+    class_name = animation_to_class[animation_name]
+
+    # Build manim command
     cmd = [
-        sys.executable, 'animations.py',
-        animation_name,
-        '--format', format_type,
-        '--quality', quality,
-        '--output', output_dir
+        sys.executable, "-m", "manim",
+        "--format", format_type,
+        "--media_dir", output_dir,
+        "--custom_folders",
+        "-v", "WARNING"  # Reduce verbosity
     ]
 
-    if config_file:
-        cmd.extend(['--config', config_file])
+    # Add quality settings
+    if quality == "low":
+        cmd.extend(["-ql"])
+    elif quality == "medium":
+        cmd.extend(["-qm"])
+    else:  # high
+        cmd.extend(["-qh"])
+
+    # Add the animation class
+    cmd.extend(["animations.py", class_name])
 
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=Path(__file__).parent)
 
-    if result.returncode == 0:
-        output_file = Path(output_dir) / f"{animation_name}.{format_type}"
-        if output_file.exists():
-            print(f"✅ Animation saved to: {output_file}")
+    try:
+        result = subprocess.run(cmd, cwd=Path(__file__).parent, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print("Animation rendering completed successfully!")
+
+            # Check for the output file (manim usually names it after the class)
+            expected_files = [
+                Path(output_dir) / f"{class_name}.{format_type}",
+                Path(output_dir) / f"{animation_name}.{format_type}"
+            ]
+
+            found_file = None
+            for expected_file in expected_files:
+                if expected_file.exists():
+                    found_file = expected_file
+                    break
+
+            if found_file:
+                print(f"SUCCESS: Animation saved to: {found_file}")
+            else:
+                # Look for manim-generated files and rename them
+                output_path = Path(output_dir)
+                if output_path.exists():
+                    # Look for files that match the class name pattern
+                    for file in output_path.glob(f"{class_name}*.{format_type}"):
+                        user_friendly_name = output_path / f"{animation_name}.{format_type}"
+                        file.rename(user_friendly_name)
+                        print(f"SUCCESS: Animation saved to: {user_friendly_name}")
+                        found_file = user_friendly_name
+                        break
+
+                if not found_file:
+                    print(f"Warning: Expected output file not found")
+                    print("Files in output directory:")
+                    for file in output_path.glob("*"):
+                        if file.is_file():
+                            print(f"  {file.name}")
         else:
-            print(f"⚠️  Animation completed but file not found at: {output_file}")
-    else:
-        print(f"❌ Animation failed with exit code: {result.returncode}")
+            print(f"ERROR: Animation rendering failed with exit code: {result.returncode}")
+            print("STDOUT:", result.stdout[-500:])  # Last 500 chars
+            if result.stderr:
+                print("STDERR:", result.stderr[-500:])  # Last 500 chars
 
-    return result.returncode
+    except Exception as e:
+        print(f"ERROR: Animation rendering failed: {e}")
+
+    return result.returncode if 'result' in locals() else 1
 
 def main():
     """Main function to handle command line arguments."""
@@ -89,16 +148,25 @@ def main():
         else:
             i += 1
 
-    # Validate animation name
-    valid_animations = [
-        'register_packing', 'exact_match', 'elimination_loop',
-        'entropy_reduction', 'stack_overwrite', 'benchmark_chart'
-    ]
+    # Validate animation name and map to class names
+    animation_to_class = {
+        'register_packing': 'RegisterPackingExecution',
+        'exact_match': 'ExactMatchExecution',
+        'elimination_loop': 'EliminationLoopExecution',
+        'entropy_reduction': 'EntropyReduction',
+        'stack_overwrite': 'StackOverwriteExecution',
+        'benchmark_chart': 'BenchmarkChart'
+    }
+
+    valid_animations = list(animation_to_class.keys())
 
     if animation_name not in valid_animations:
-        print(f"❌ Unknown animation: {animation_name}")
+        print(f"ERROR: Unknown animation: {animation_name}")
         print(f"Available: {', '.join(valid_animations)}")
         return 1
+
+    # Get the actual class name for manim
+    class_name = animation_to_class[animation_name]
 
     # Create output directory if it doesn't exist
     Path(output_dir).mkdir(parents=True, exist_ok=True)
