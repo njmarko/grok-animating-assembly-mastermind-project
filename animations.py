@@ -267,11 +267,48 @@ class RegisterPackingVisual(Scene):
             current_expl = rorb_expl
             self.wait(1)
 
-            # Show rorl $8 operation
-            rorl_expl = Tex(r"rorl \$8, \%ebx - shift to next byte").scale(0.65).to_edge(DOWN)
+            # Show rorl $8 operation with actual rotation animation
+            rorl_expl = Tex(r"rorl \$8, \%ebx - rotate entire register left by 8 bits").scale(0.65).to_edge(DOWN)
             self.play(ReplacementTransform(current_expl, rorl_expl))
             current_expl = rorl_expl
-            self.wait(1)
+
+            # Animate the actual rotation: all bytes shift left, leftmost byte goes to rightmost position
+            # Current layout: [byte3, byte2, byte1, byte0] from left to right
+            # After rotation: [byte2, byte1, byte0, byte3] (each byte moves left by 8 bits)
+
+            # Calculate new positions for each byte
+            byte_shift_distance = 3.0  # Distance between byte centers
+
+            # Store current positions
+            current_positions = [byte.get_center() for byte in byte_squares]
+
+            # Calculate new positions: each byte moves left by one position
+            # byte3 (leftmost) moves to byte0 position (rightmost)
+            new_positions = [
+                current_positions[3],  # byte3 moves to byte0 position
+                current_positions[0],  # byte0 moves to byte1 position
+                current_positions[1],  # byte1 moves to byte2 position
+                current_positions[2],  # byte2 moves to byte3 position
+            ]
+
+            # Also need to reorder the byte_squares list to match new layout
+            # After rotation: [byte2, byte1, byte0, byte3]
+            temp_byte_squares = [byte_squares[1], byte_squares[2], byte_squares[3], byte_squares[0]]
+
+            # Animate the rotation
+            self.play(
+                *[byte_squares[i].animate.move_to(new_positions[i]) for i in range(4)],
+                run_time=1.5
+            )
+
+            # Update the byte_squares reference and byte labels
+            byte_squares = VGroup(*temp_byte_squares)
+
+            # Update byte labels to reflect new positions
+            for i, label in enumerate(byte_labels):
+                new_label = Tex(f"Byte {3 - i}").scale(0.6)
+                new_label.move_to(label.get_center())
+                self.play(Transform(label, new_label), run_time=0.5)
 
             # Unhighlight legend
             self.play(legend_row.animate.set_color(WHITE))
