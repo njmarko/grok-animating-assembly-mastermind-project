@@ -172,6 +172,128 @@ class RegisterPackingExecution(BaseAnimation):
         self.cleanup_scene(title)
 
 
+class RegisterPackingDetailed(Scene):
+    def construct(self):
+        # Title
+        title = Tex(r"Packing the Combination into One 32-bit Register").scale(0.9)
+        self.play(Write(title))
+        self.wait(2)
+        self.play(FadeOut(title))
+
+        # Main register - 32 bits divided into 4 colored bytes
+        register = VGroup()
+        byte_colors = [BLUE_D, TEAL_D, GREEN_D, PURPLE_D]
+        bit_groups = []
+        for byte_idx in range(4):
+            start_bit = byte_idx * 8
+            end_bit = start_bit + 8
+            byte_bits = VGroup(*[
+                Square(side_length=0.4, color=byte_colors[byte_idx], fill_opacity=0.2, stroke_width=2)
+                for _ in range(8)
+            ]).arrange(RIGHT, buff=0)
+            byte_bits.shift(RIGHT * (byte_idx * 3.6 - 6.3))
+            bit_groups.append(byte_bits)
+            register.add(byte_bits)
+
+        register.move_to(ORIGIN + UP * 1.5)
+
+        reg_label = Tex(r"32-bit Register (\%ebx)").next_to(register, UP, buff=0.8)
+        byte_labels = VGroup(
+            Tex(r"Byte 3").next_to(bit_groups[0], DOWN, buff=0.5),
+            Tex(r"Byte 2").next_to(bit_groups[1], DOWN, buff=0.5),
+            Tex(r"Byte 1").next_to(bit_groups[2], DOWN, buff=0.5),
+            Tex(r"Byte 0").next_to(bit_groups[3], DOWN, buff=0.5),
+        )
+
+        self.play(
+            FadeIn(register),
+            Write(reg_label),
+            Write(byte_labels)
+        )
+
+        # Legend on the right
+        legend_title = Tex(r"Symbol Encoding").scale(0.8).to_corner(UR)
+        legend = VGroup(legend_title)
+        symbols = ["SKOCKO (1)", "TREF (2)", "PIK (3)", "HERC (4)", "KARO (5)", "ZVEZDA (6)"]
+        patterns = ["10000000", "01000000", "00100000", "00010000", "00001000", "00000100"]
+        legend_colors = [RED, ORANGE, YELLOW, GREEN, BLUE, PURPLE]
+
+        for sym, pat, col in zip(symbols, patterns, legend_colors):
+            row = VGroup(
+                Tex(sym).scale(0.7),
+                Tex(pat).scale(0.7).set_color(col)
+            ).arrange(RIGHT, buff=1)
+            legend.add(row)
+
+        legend.arrange(DOWN, aligned_edge=LEFT, buff=0.4).next_to(legend_title, DOWN, buff=0.6)
+        self.play(Write(legend))
+
+        # Initial explanation
+        expl = Tex(r"Initial mask: all positions ready").scale(0.7).to_edge(DOWN)
+        self.play(Write(expl))
+
+        # Example placement order (e.g., symbols 1, 3, 5, 6)
+        placement_order = [0, 2, 4, 5]  # indices in legend: SKOCKO, PIK, KARO, ZVEZDA
+        byte_targets = [3, 2, 1, 0]    # which byte to fill (right to left)
+
+        current_expl = expl
+
+        for step, (sym_idx, target_byte) in enumerate(zip(placement_order, byte_targets)):
+            # Highlight legend row
+            legend_row = legend[step + 1]
+            self.play(legend_row.animate.set_color(YELLOW))
+
+            # Show incoming byte block below, aligned to target
+            incoming_byte = VGroup(*[
+                Square(side_length=0.4, color=byte_colors[target_byte], fill_opacity=0.4)
+                for _ in range(8)
+            ]).arrange(RIGHT, buff=0)
+            incoming_byte.next_to(bit_groups[target_byte], DOWN, buff=1)
+
+            pattern = patterns[sym_idx]
+            for i, bit in enumerate(pattern):
+                if bit == "1":
+                    incoming_byte[i].set_fill(legend_colors[sym_idx], opacity=1)
+
+            incoming_label = Tex(symbols[sym_idx]).scale(0.7).next_to(incoming_byte, DOWN)
+
+            self.play(FadeIn(incoming_byte, incoming_label))
+
+            # Explanation: rorb to place bit in low byte
+            new_expl = Tex(r"Step {}: rorb \%cl, \%bl - rotate low byte to place bit".format(step+1)).scale(0.7).to_edge(DOWN)
+            self.play(ReplacementTransform(current_expl, new_expl))
+            current_expl = new_expl
+
+            # Animate rotation into low byte (visual swirl)
+            low_byte = bit_groups[3]  # always low byte before shift
+            self.play(Rotate(incoming_byte, angle=PI, about_point=low_byte.get_center()), run_time=1.2)
+            self.play(FadeOut(incoming_byte, incoming_label))
+
+            # Light the correct bit in low byte
+            bit_pos = pattern.find("1")
+            low_byte[bit_pos].set_fill(legend_colors[sym_idx], opacity=1)
+            self.play(low_byte[bit_pos].animate.scale(1.3), run_time=0.4)
+            self.play(low_byte[bit_pos].animate.scale(1/1.3))
+
+            # Explanation: rorl $8 to shift whole register left by 8 bits
+            new_expl = Tex(r"rorl \$8, \%ebx - shift everything left by 8 bits").scale(0.7).to_edge(DOWN)
+            self.play(ReplacementTransform(current_expl, new_expl))
+            current_expl = new_expl
+
+            # Animate full register shift left (bits move left)
+            self.play(register.animate.shift(LEFT * 3.6), run_time=1.5)  # visual shift of one byte
+            # Reset position for next iteration
+            self.play(register.animate.shift(RIGHT * 3.6), run_time=0.01)
+
+            # Unhighlight legend
+            self.play(legend_row.animate.set_color(WHITE))
+
+        # Final state
+        final_expl = Tex(r"Full 4-symbol combination packed in one register!").scale(0.8).set_color(GREEN).to_edge(DOWN)
+        self.play(ReplacementTransform(current_expl, final_expl))
+        self.wait(3)
+
+
 class ExactMatchExecution(BaseAnimation):
     """Animation showing exact match calculation with bit operations."""
 
@@ -643,9 +765,15 @@ class BenchmarkChart(BaseAnimation):
         self.cleanup_scene(title)
 
 
-def create_animation(animation_name: str, config: Dict[str, Any] = None) -> BaseAnimation:
+def create_animation(animation_name: str, config: Dict[str, Any] = None):
     """Factory function to create animation instances."""
-    animations = {
+    # Scene-based animations (don't inherit from BaseAnimation)
+    scene_animations = {
+        'register_packing_detailed': RegisterPackingDetailed,
+    }
+
+    # BaseAnimation-based animations
+    base_animations = {
         'register_packing': RegisterPackingExecution,
         'exact_match': ExactMatchExecution,
         'elimination_loop': EliminationLoopExecution,
@@ -654,10 +782,18 @@ def create_animation(animation_name: str, config: Dict[str, Any] = None) -> Base
         'benchmark_chart': BenchmarkChart,
     }
 
-    if animation_name not in animations:
-        raise ValueError(f"Unknown animation: {animation_name}. Available: {list(animations.keys())}")
+    all_animations = {**scene_animations, **base_animations}
 
-    return animations[animation_name](config)
+    if animation_name not in all_animations:
+        raise ValueError(f"Unknown animation: {animation_name}. Available: {list(all_animations.keys())}")
+
+    animation_class = all_animations[animation_name]
+
+    # Scene-based animations don't take config parameter
+    if animation_name in scene_animations:
+        return animation_class()
+    else:
+        return animation_class(config)
 
 
 def main():

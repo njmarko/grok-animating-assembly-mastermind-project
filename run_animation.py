@@ -20,6 +20,7 @@ def run_animation(animation_name: str, format_type: str = 'gif', quality: str = 
     # Map animation names to class names
     animation_to_class = {
         'register_packing': 'RegisterPackingExecution',
+        'register_packing_detailed': 'RegisterPackingDetailed',
         'exact_match': 'ExactMatchExecution',
         'elimination_loop': 'EliminationLoopExecution',
         'entropy_reduction': 'EntropyReduction',
@@ -108,6 +109,7 @@ def main():
         print("\nAvailable animations:")
         animations = [
             'register_packing - Register bit placement execution',
+            'register_packing_detailed - Detailed register packing with visual bytes',
             'exact_match - Exact match calculation with bit operations',
             'elimination_loop - Candidate elimination loop execution',
             'entropy_reduction - Entropy reduction visualization',
@@ -151,6 +153,7 @@ def main():
     # Validate animation name and map to class names
     animation_to_class = {
         'register_packing': 'RegisterPackingExecution',
+        'register_packing_detailed': 'RegisterPackingDetailed',
         'exact_match': 'ExactMatchExecution',
         'elimination_loop': 'EliminationLoopExecution',
         'entropy_reduction': 'EntropyReduction',
