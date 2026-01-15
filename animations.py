@@ -172,7 +172,8 @@ class RegisterPackingExecution(BaseAnimation):
         self.cleanup_scene(title)
 
 
-class RegisterPackingDetailed(Scene):
+
+class RegisterPackingAccurateFixed(Scene):
     def construct(self):
         # Title
         title = Tex(r"Packing the Combination into One 32-bit Register").scale(0.9)
@@ -180,116 +181,100 @@ class RegisterPackingDetailed(Scene):
         self.wait(2)
         self.play(FadeOut(title))
 
-        # Main register - 32 bits divided into 4 colored bytes
-        register = VGroup()
+        # Simple register visualization with 4 bytes
+        register_frame = Rectangle(width=12, height=1.2, color=WHITE, stroke_width=3)
+        register_frame.to_edge(UP, buff=1)
+
+        reg_label = Tex(r"32-bit Register (\%ebx)").next_to(register_frame, UP, buff=0.5)
+
+        # 4 colored byte sections
         byte_colors = [BLUE_D, TEAL_D, GREEN_D, PURPLE_D]
-        bit_groups = []
+        byte_squares = VGroup()
+        byte_labels = VGroup()
+
         for byte_idx in range(4):
-            start_bit = byte_idx * 8
-            end_bit = start_bit + 8
-            byte_bits = VGroup(*[
-                Square(side_length=0.4, color=byte_colors[byte_idx], fill_opacity=0.2, stroke_width=2)
-                for _ in range(8)
-            ]).arrange(RIGHT, buff=0)
-            byte_bits.shift(RIGHT * (byte_idx * 3.6 - 6.3))
-            bit_groups.append(byte_bits)
-            register.add(byte_bits)
+            start_x = -5.4 + byte_idx * 3
+            byte_group = VGroup()
+            for bit in range(8):
+                sq = Square(side_length=0.35, color=byte_colors[byte_idx], fill_opacity=0.2, stroke_width=1)
+                sq.move_to(register_frame.get_center() + RIGHT * (start_x + bit * 0.38))
+                byte_group.add(sq)
+            byte_squares.add(byte_group)
 
-        register.move_to(ORIGIN + UP * 1.5)
-
-        reg_label = Tex(r"32-bit Register (\%ebx)").next_to(register, UP, buff=0.8)
-        byte_labels = VGroup(
-            Tex(r"Byte 3").next_to(bit_groups[0], DOWN, buff=0.5),
-            Tex(r"Byte 2").next_to(bit_groups[1], DOWN, buff=0.5),
-            Tex(r"Byte 1").next_to(bit_groups[2], DOWN, buff=0.5),
-            Tex(r"Byte 0").next_to(bit_groups[3], DOWN, buff=0.5),
-        )
+            b_label = Tex(f"Byte {3 - byte_idx}").scale(0.6)
+            b_label.next_to(byte_group, DOWN, buff=0.6)
+            byte_labels.add(b_label)
 
         self.play(
-            FadeIn(register),
+            Create(register_frame),
             Write(reg_label),
+            FadeIn(byte_squares),
             Write(byte_labels)
         )
 
-        # Legend on the right
-        legend_title = Tex(r"Symbol Encoding").scale(0.8).to_corner(UR)
+        # Legend - symbol encodings
+        legend_title = Tex(r"Symbol Encoding").scale(0.6).to_corner(DR).shift(LEFT*1.5 + UP*0.5)
         legend = VGroup(legend_title)
-        symbols = ["SKOCKO (1)", "TREF (2)", "PIK (3)", "HERC (4)", "KARO (5)", "ZVEZDA (6)"]
+
+        symbols = ["SKOCKO", "TREF", "PIK", "HERC", "KARO", "ZVEZDA"]
         patterns = ["10000000", "01000000", "00100000", "00010000", "00001000", "00000100"]
         legend_colors = [RED, ORANGE, YELLOW, GREEN, BLUE, PURPLE]
 
         for sym, pat, col in zip(symbols, patterns, legend_colors):
-            row = VGroup(
-                Tex(sym).scale(0.7),
-                Tex(pat).scale(0.7).set_color(col)
-            ).arrange(RIGHT, buff=1)
+            pat_tex = Tex(pat).scale(0.55).set_color(col)
+            row = VGroup(Tex(sym).scale(0.55), pat_tex).arrange(RIGHT, buff=0.8)
             legend.add(row)
 
-        legend.arrange(DOWN, aligned_edge=LEFT, buff=0.4).next_to(legend_title, DOWN, buff=0.6)
+        legend.arrange(DOWN, aligned_edge=LEFT, buff=0.35).next_to(legend_title, DOWN, buff=0.3)
         self.play(Write(legend))
 
-        # Initial explanation
-        expl = Tex(r"Initial mask: all positions ready").scale(0.7).to_edge(DOWN)
-        self.play(Write(expl))
+        # Combination: ZVEZDA-KARO-HERC-SKOCKO
+        combo = ["ZVEZDA", "KARO", "HERC", "SKOCKO"]
+        combo_indices = [5, 4, 3, 0]
+        final_patterns = ["00000100", "00001000", "00010000", "10000000"]
 
-        # Example placement order (e.g., symbols 1, 3, 5, 6)
-        placement_order = [0, 2, 4, 5]  # indices in legend: SKOCKO, PIK, KARO, ZVEZDA
-        byte_targets = [3, 2, 1, 0]    # which byte to fill (right to left)
+        intro_expl = Tex(r"Packing combination: ZVEZDA → KARO → HERC → SKOCKO").scale(0.7).to_edge(DOWN)
+        self.play(Write(intro_expl))
+        self.wait(2)
 
-        current_expl = expl
+        current_expl = intro_expl
 
-        for step, (sym_idx, target_byte) in enumerate(zip(placement_order, byte_targets)):
-            # Highlight legend row
-            legend_row = legend[step + 1]
+        for step, (sym, sym_idx, pattern) in enumerate(zip(combo, combo_indices, final_patterns)):
+            # Highlight legend
+            legend_row = legend[sym_idx + 1]
             self.play(legend_row.animate.set_color(YELLOW))
 
-            # Show incoming byte block below, aligned to target
-            incoming_byte = VGroup(*[
-                Square(side_length=0.4, color=byte_colors[target_byte], fill_opacity=0.4)
-                for _ in range(8)
-            ]).arrange(RIGHT, buff=0)
-            incoming_byte.next_to(bit_groups[target_byte], DOWN, buff=1)
+            # Show which byte gets this symbol
+            target_byte = 3 - step  # Start with low byte (rightmost)
 
-            pattern = patterns[sym_idx]
+            # Load pattern explanation
+            load_expl = Tex(fr"Step {step+1}: Load {sym} pattern into Byte {target_byte}").scale(0.65).to_edge(DOWN)
+            self.play(ReplacementTransform(current_expl, load_expl))
+            current_expl = load_expl
+
+            # Set the bits in the target byte
+            target_byte_squares = byte_squares[target_byte]
             for i, bit in enumerate(pattern):
                 if bit == "1":
-                    incoming_byte[i].set_fill(legend_colors[sym_idx], opacity=1)
+                    self.play(target_byte_squares[i].animate.set_fill(legend_colors[sym_idx], opacity=1), run_time=0.3)
 
-            incoming_label = Tex(symbols[sym_idx]).scale(0.7).next_to(incoming_byte, DOWN)
+            # Show rorb operation
+            rorb_expl = Tex(r"rorb \%cl, \%bl - rotate byte to position").scale(0.65).to_edge(DOWN)
+            self.play(ReplacementTransform(current_expl, rorb_expl))
+            current_expl = rorb_expl
+            self.wait(1)
 
-            self.play(FadeIn(incoming_byte, incoming_label))
-
-            # Explanation: rorb to place bit in low byte
-            new_expl = Tex(r"Step {}: rorb \%cl, \%bl - rotate low byte to place bit".format(step+1)).scale(0.7).to_edge(DOWN)
-            self.play(ReplacementTransform(current_expl, new_expl))
-            current_expl = new_expl
-
-            # Animate rotation into low byte (visual swirl)
-            low_byte = bit_groups[3]  # always low byte before shift
-            self.play(Rotate(incoming_byte, angle=PI, about_point=low_byte.get_center()), run_time=1.2)
-            self.play(FadeOut(incoming_byte, incoming_label))
-
-            # Light the correct bit in low byte
-            bit_pos = pattern.find("1")
-            low_byte[bit_pos].set_fill(legend_colors[sym_idx], opacity=1)
-            self.play(low_byte[bit_pos].animate.scale(1.3), run_time=0.4)
-            self.play(low_byte[bit_pos].animate.scale(1/1.3))
-
-            # Explanation: rorl $8 to shift whole register left by 8 bits
-            new_expl = Tex(r"rorl \$8, \%ebx - shift everything left by 8 bits").scale(0.7).to_edge(DOWN)
-            self.play(ReplacementTransform(current_expl, new_expl))
-            current_expl = new_expl
-
-            # Animate full register shift left (bits move left)
-            self.play(register.animate.shift(LEFT * 3.6), run_time=1.5)  # visual shift of one byte
-            # Reset position for next iteration
-            self.play(register.animate.shift(RIGHT * 3.6), run_time=0.01)
+            # Show rorl $8 operation
+            rorl_expl = Tex(r"rorl \$8, \%ebx - shift to next byte").scale(0.65).to_edge(DOWN)
+            self.play(ReplacementTransform(current_expl, rorl_expl))
+            current_expl = rorl_expl
+            self.wait(1)
 
             # Unhighlight legend
             self.play(legend_row.animate.set_color(WHITE))
 
-        # Final state
-        final_expl = Tex(r"Full 4-symbol combination packed in one register!").scale(0.8).set_color(GREEN).to_edge(DOWN)
+        # Final result
+        final_expl = Tex(r"Complete combination packed in 32-bit register!").scale(0.8).set_color(GREEN).to_edge(DOWN)
         self.play(ReplacementTransform(current_expl, final_expl))
         self.wait(3)
 
@@ -770,6 +755,8 @@ def create_animation(animation_name: str, config: Dict[str, Any] = None):
     # Scene-based animations (don't inherit from BaseAnimation)
     scene_animations = {
         'register_packing_detailed': RegisterPackingDetailed,
+        'register_packing_accurate': RegisterPackingAccurate,
+        'register_packing_accurate_fixed': RegisterPackingAccurateFixed,
     }
 
     # BaseAnimation-based animations

@@ -21,6 +21,8 @@ def run_animation(animation_name: str, format_type: str = 'gif', quality: str = 
     animation_to_class = {
         'register_packing': 'RegisterPackingExecution',
         'register_packing_detailed': 'RegisterPackingDetailed',
+        'register_packing_accurate': 'RegisterPackingAccurate',
+        'register_packing_accurate_fixed': 'RegisterPackingAccurateFixed',
         'exact_match': 'ExactMatchExecution',
         'elimination_loop': 'EliminationLoopExecution',
         'entropy_reduction': 'EntropyReduction',
@@ -110,6 +112,8 @@ def main():
         animations = [
             'register_packing - Register bit placement execution',
             'register_packing_detailed - Detailed register packing with visual bytes',
+            'register_packing_accurate - Accurate register packing with bit rotation',
+            'register_packing_accurate_fixed - Fixed accurate register packing with bit labels',
             'exact_match - Exact match calculation with bit operations',
             'elimination_loop - Candidate elimination loop execution',
             'entropy_reduction - Entropy reduction visualization',
@@ -154,6 +158,8 @@ def main():
     animation_to_class = {
         'register_packing': 'RegisterPackingExecution',
         'register_packing_detailed': 'RegisterPackingDetailed',
+        'register_packing_accurate': 'RegisterPackingAccurate',
+        'register_packing_accurate_fixed': 'RegisterPackingAccurateFixed',
         'exact_match': 'ExactMatchExecution',
         'elimination_loop': 'EliminationLoopExecution',
         'entropy_reduction': 'EntropyReduction',
