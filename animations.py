@@ -173,7 +173,7 @@ class RegisterPackingExecution(BaseAnimation):
 
 
 
-class RegisterPackingAccurateFixed(Scene):
+class RegisterPackingVisual(Scene):
     def construct(self):
         # Title
         title = Tex(r"Packing the Combination into One 32-bit Register").scale(0.9)
@@ -182,7 +182,7 @@ class RegisterPackingAccurateFixed(Scene):
         self.play(FadeOut(title))
 
         # Simple register visualization with 4 bytes
-        register_frame = Rectangle(width=12, height=1.2, color=WHITE, stroke_width=3)
+        register_frame = Rectangle(width=13, height=1.2, color=WHITE, stroke_width=3)
         register_frame.to_edge(UP, buff=1)
 
         reg_label = Tex(r"32-bit Register (\%ebx)").next_to(register_frame, UP, buff=0.5)
@@ -220,9 +220,12 @@ class RegisterPackingAccurateFixed(Scene):
         patterns = ["10000000", "01000000", "00100000", "00010000", "00001000", "00000100"]
         legend_colors = [RED, ORANGE, YELLOW, GREEN, BLUE, PURPLE]
 
-        for sym, pat, col in zip(symbols, patterns, legend_colors):
+        # Create legend with padded symbol names for alignment
+        padded_symbols = ["SKOCKO  ", "TREF    ", "PIK     ", "HERC    ", "KARO    ", "ZVEZDA  "]
+
+        for sym, pat, col in zip(padded_symbols, patterns, legend_colors):
             pat_tex = Tex(pat).scale(0.55).set_color(col)
-            row = VGroup(Tex(sym).scale(0.55), pat_tex).arrange(RIGHT, buff=0.8)
+            row = VGroup(Tex(sym).scale(0.55), pat_tex).arrange(RIGHT, buff=0.3)
             legend.add(row)
 
         legend.arrange(DOWN, aligned_edge=LEFT, buff=0.35).next_to(legend_title, DOWN, buff=0.3)
@@ -756,7 +759,7 @@ def create_animation(animation_name: str, config: Dict[str, Any] = None):
     scene_animations = {
         'register_packing_detailed': RegisterPackingDetailed,
         'register_packing_accurate': RegisterPackingAccurate,
-        'register_packing_accurate_fixed': RegisterPackingAccurateFixed,
+        'register_packing_visual': RegisterPackingVisual,
     }
 
     # BaseAnimation-based animations
