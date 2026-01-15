@@ -247,27 +247,21 @@ class RegisterPackingVisual(Scene):
             legend_row = legend[sym_idx + 1]
             self.play(legend_row.animate.set_color(YELLOW))
 
-            # Show which byte gets this symbol
-            target_byte = 3 - step  # Start with low byte (rightmost)
+            # Always load into byte 0 (rightmost byte)
+            target_byte = 3  # Always byte 0 (rightmost in our visualization)
 
             # Load pattern explanation
-            load_expl = Tex(fr"Step {step+1}: Load {sym} pattern into Byte {target_byte}").scale(0.65).to_edge(DOWN)
+            load_expl = Tex(fr"Step {step+1}: Load {sym} pattern into Byte 0 (rightmost)").scale(0.65).to_edge(DOWN)
             self.play(ReplacementTransform(current_expl, load_expl))
             current_expl = load_expl
 
-            # Set the bits in the target byte
+            # Set the bits in byte 0 (rightmost)
             target_byte_squares = byte_squares[target_byte]
             for i, bit in enumerate(pattern):
                 if bit == "1":
                     self.play(target_byte_squares[i].animate.set_fill(legend_colors[sym_idx], opacity=1), run_time=0.3)
 
-            # Show rorb operation
-            rorb_expl = Tex(r"rorb \%cl, \%bl - rotate byte to position").scale(0.65).to_edge(DOWN)
-            self.play(ReplacementTransform(current_expl, rorb_expl))
-            current_expl = rorb_expl
-            self.wait(1)
-
-            # Show rorl $8 operation with actual rotation animation
+            # Show rorl $8 operation - rotate left by 8 bits immediately after loading
             rorl_expl = Tex(r"rorl \$8, \%ebx - rotate entire register left by 8 bits").scale(0.65).to_edge(DOWN)
             self.play(ReplacementTransform(current_expl, rorl_expl))
             current_expl = rorl_expl
